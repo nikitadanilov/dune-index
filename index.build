@@ -1,0 +1,149 @@
+#! /bin/sh
+
+#set -x
+
+if [[ ! -r tags || ! -r db || ! -d all || $# > 0 ]] ;then
+    cat <<QUOTE
+This script builds a simple media index for dune HD player.
+
+It should be run in a directory, accessible to the dune player. The directory
+should contain:
+
+    - a directory "all" containing all the media (movies, albums, shows, etc.)
+      to be indexed. Anything in this directory is called a "media element".
+
+    - A file named "db", associating tags with media elements.
+
+    - A file named "tags", associating pathnames with tags.
+
+A media element should be a separate directory. Directory names should not
+contain spaces. For example:
+
+$ ls all | head -7
+Another-Thin-Man-(1939)
+Fritz-Lang---M-(1931)
+La-Chute-de-la-Maison-Usher-(Jean-Epstein,-1928)
+Metropolis-1927-COMPLETE
+The-Testament-of-Dr-Mabuse-(Fritz-Lang-1933)
+The-Thin-Man-(1934)
+The-Wizard-of-Oz-(1939)
+
+A media element directory should contain actual media files or sub-directories.
+
+Every media element should have a matching line in the db file. A line in the db
+file has the following format:
+
+tag1 tag2 ... tagN media-element-name/
+
+Where tags are classification markers, indicating a category in which the media
+element should be placed.
+
+$ head -7 db
+old det Another-Thin-Man-(1939)/
+old lang Fritz-Lang---M-(1931)/
+old fr La-Chute-de-la-Maison-Usher-(Jean-Epstein,-1928).avi/
+old lang Metropolis-1927/
+old lang The-Testament-of-Dr-Mabuse-(Fritz-Lang-1933)/
+old det The-Thin-Man-(1934)/
+old child The-Wizard-of-Oz-(1939)/
+
+Mapping from tags to file pathnames is given in the "tags" file. Each line in
+this file has the following format:
+
+tag pathname
+
+For example:
+
+$ head tags
+time           time
+old            time/old
+fr             country/France
+greenaway      director/Greenaway
+lang           director/Lang
+olivier        actor/Olivier
+sellers        actor/Sellers
+det            genre/criminal
+com            genre/comedy
+unk            unclassified
+
+The script goes through every media element, mentioned in the db file, and for
+every tag associated with the element, creates in the appropriate directory (as
+defined by the tags file) a "link" to the media element. The link is, in fact, a
+directory with specially constructed "dune_folder.txt" file that instructs Dune
+to play the original media element.
+
+A few points:
+
+    * if a media element has no tags, the tag "unk" is automatically
+      assumed. This can be used to put all unknown elements in a single
+      category;
+
+    * if element's name contains something that looks like a year number, the
+      element is automaticaly placed in the appropriate category under "time"
+      tag;
+
+    * media elements containing sub-directories should be tagged with "ser"
+      tag. This would instruct Dune to browse sub-directories instead of playing
+      their contents.
+
+QUOTE
+exit
+fi
+
+echo Cleaning the index.
+while read ;do
+    set $REPLY
+    topdir=$(echo $2 | sed 's|/.*||')
+    rm -fr $topdir                      || exit
+done < tags
+
+function gettags()
+{
+    local word=$1
+    local paths=""
+    while read ;do
+	set $REPLY
+	tag=$1
+	path=$2
+	if [ $word = $tag ] ;then
+	    paths="$paths $path"
+	fi
+    done < tags
+    echo $paths
+}
+
+echo Rebuilding...
+cat db | while read ;do
+    set $REPLY
+    ps=""
+    ser=""
+    while [ $# -gt 1 ] ;do
+	if [ x$1 = xser ] ;then
+	    ser=yes
+	else
+	    ps="$ps $(gettags $1)"
+	fi
+	shift
+    done
+    name="$1"
+    echo "        $name..."
+    if [[ $name =~ .*[^0-9]\([12][0-9][0-9][0-9]\)[^0-9].* ]] ;then
+	ps="$ps $(gettags time)/${BASH_REMATCH[1]}"
+    fi
+    if [ -z "$ps" ] ;then
+	ps="$(gettags unk)"
+    fi
+    for d in $ps ;do
+	echo "                $d"
+	mkdir -p $d/$name                         || exit
+	if [ -z $ser ] ;then
+	    action="play"
+	else
+	    action="browse"
+	fi
+	cat > $d/$name/dune_folder.txt <<-QUOTE
+            media_url = $(echo $d/ | sed 's|[^/]*/|../|g')../all/$name
+            media_action = $action
+QUOTE
+    done
+done
