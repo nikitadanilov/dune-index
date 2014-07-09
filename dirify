@@ -1,0 +1,41 @@
+#! /bin/bash
+
+#
+# Scan current directory for the new entries and add them to the database as
+# "new"
+#
+
+#
+# First, move each non-directory file in a directory by its own.
+#
+find . -type f -maxdepth 1 | while read ;do 
+     f="$REPLY"
+     t=$(echo $f | tr ' ' '-')
+     echo "$f" '->' "$t"
+     mv "$f" _t
+     mkdir "$t"
+     mv _t "$t/$f"
+done
+
+#
+# Then, fix all the names, replacing spaces with '-'.
+#
+find . -maxdepth 1 | while read ;do 
+     f="$REPLY"
+     t=$(echo $f | tr ' ' '-')
+     if [ "x$f" != "x$t" ] ;then
+         echo "$f" '->' "$t"
+         mv "$f" "$t"
+     fi
+done
+
+#
+# Finally, add missing entries to the data-base.
+#
+find . -maxdepth 1 | while read ;do 
+     f=$(basename "$REPLY")
+     if [ "$f" = "." ] ;then continue; fi
+     grep -F " $f/" ../db >/dev/null && continue
+     echo "new $f/" >> ../db
+     echo "new $f/"
+done
