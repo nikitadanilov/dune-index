@@ -10,7 +10,7 @@
 #
 find . -type f -maxdepth 1 | while read ;do 
      f="$REPLY"
-     t=$(echo $f | tr ' ' '-')
+     t=$(echo "$f" | tr ' ' '-')
      echo "$f" '->' "$t"
      mv "$f" _t
      mkdir "$t"
@@ -22,7 +22,7 @@ done
 #
 find . -maxdepth 1 | while read ;do 
      f="$REPLY"
-     t=$(echo $f | tr ' ' '-')
+     t=$(echo "$f" | tr ' ' '-')
      if [ "x$f" != "x$t" ] ;then
          echo "$f" '->' "$t"
          mv "$f" "$t"
