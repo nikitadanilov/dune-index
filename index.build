@@ -107,6 +107,7 @@ function gettags()
 	path=$2
 	if [ $word = $tag ] ;then
 	    paths="$paths $path"
+	    break
 	fi
     done < tags
     echo $paths
@@ -116,7 +117,7 @@ echo Rebuilding...
 cat db | while read ;do
     set $REPLY
     ps=""
-    ser=""
+    ser="yes"  # use "browse" format by default.
     while [ $# -gt 1 ] ;do
 	if [ x$1 = xser ] ;then
 	    ser=yes
@@ -133,6 +134,15 @@ cat db | while read ;do
     if [ -z "$ps" ] ;then
 	ps="$(gettags unk)"
     fi
+    case "$name" in
+	[a-zA-Z0-9_]*)
+	    first=${name:0:1}
+	    ;;
+	*)
+	    first=${name:0:2} # All hail UTF!
+	    ;;
+    esac
+    ps="$ps $(gettags abc)/$first"
     for d in $ps ;do
 	echo "                $d"
 	mkdir -p $d/$name                         || exit
